@@ -147,8 +147,8 @@ export function TaskSection({
         ) : (
           pendingTasks.map((task) => (
             <article key={task.id} className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-700/30">
-              <div className="flex items-start justify-between gap-2">
-                <div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold tracking-tight">{task.name}</p>
                   {(task.deadlineDate || task.deadlineTime) && (
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -158,7 +158,7 @@ export function TaskSection({
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                   <button
                     type="button"
                     className="button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px]"
