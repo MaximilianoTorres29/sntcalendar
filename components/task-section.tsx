@@ -75,7 +75,7 @@ export function TaskSection({
         </p>
       </div>
 
-      <form className="space-y-2.5 rounded-2xl border border-slate-200 bg-white/60 p-3.5 dark:border-slate-700 dark:bg-slate-700/30" onSubmit={submitTask}>
+      <form className="space-y-3 rounded-2xl border border-slate-200 bg-white/60 p-4 dark:border-slate-700 dark:bg-slate-700/30" onSubmit={submitTask}>
         <input
           className="input"
           placeholder="Nombre de la tarea"
@@ -87,7 +87,7 @@ export function TaskSection({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Opciones rápidas
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 px-1">
             {QUICK_TASK_OPTIONS.map((option) => (
               <button
                 key={option}
@@ -104,7 +104,7 @@ export function TaskSection({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 px-1 sm:grid-cols-2">
           <label className="space-y-1">
             <span className="block px-1 text-xs font-medium text-slate-500 dark:text-slate-400">Fecha (opcional)</span>
             <input
@@ -124,7 +124,7 @@ export function TaskSection({
             />
           </label>
         </div>
-        <button type="submit" className="button-primary w-full">
+        <button type="submit" className="button-primary mt-1 w-full">
           Agregar tarea
         </button>
       </form>
@@ -164,7 +164,7 @@ export function TaskSection({
                     </p>
                   )}
                 </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end">
+                <div className="mt-1 flex flex-col gap-1.5 sm:mt-0 sm:flex-row sm:items-center sm:justify-end">
                   <button
                     type="button"
                     className="button-secondary inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px]"
