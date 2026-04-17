@@ -158,17 +158,17 @@ export function TaskSection({
                     </p>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end">
                   <button
                     type="button"
-                    className="button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px]"
+                    className="button-secondary inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px]"
                     onClick={() => onToggleTask(task.id, true)}
                   >
                     <Check size={12} /> Completar
                   </button>
                   <button
                     type="button"
-                    className="button-secondary inline-flex items-center gap-1 px-2 py-1 text-[11px] text-red-600 dark:text-red-400"
+                    className="button-secondary inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] text-red-600 dark:text-red-400"
                     onClick={() => onDeleteTask(task.id)}
                   >
                     <Trash2 size={12} /> Eliminar
