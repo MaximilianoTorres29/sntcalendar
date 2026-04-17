@@ -104,15 +104,15 @@ export function TaskSection({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <input
-            className="input"
+            className="input min-w-0"
             type="date"
             value={form.deadlineDate}
             onChange={(event) => setForm((prev) => ({ ...prev, deadlineDate: event.target.value }))}
           />
           <input
-            className="input"
+            className="input min-w-0"
             type="time"
             value={form.deadlineTime}
             onChange={(event) => setForm((prev) => ({ ...prev, deadlineTime: event.target.value }))}
