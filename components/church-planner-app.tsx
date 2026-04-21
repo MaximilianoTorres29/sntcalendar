@@ -11,6 +11,7 @@ import { TaskSection } from "./task-section";
 import { ThemeToggle } from "./theme-toggle";
 import { ActivityType, CalendarView, EventItem, TaskItem } from "@/lib/types";
 import { loadEvents, loadTasks, loadTheme, saveEvents, saveTasks, saveTheme } from "@/lib/storage";
+import { getCurrentUser, isCloudEnabled, loadPlannerData, savePlannerData, signInWithEmail, signOutCloud, signUpWithEmail } from "@/lib/cloud-storage";
 
 const NOTIFICATION_WINDOW_MINUTES = 10;
 
@@ -29,6 +30,7 @@ interface TaskInput {
 }
 
 type AppTab = "inicio" | "calendario" | "tareas";
+type AuthMode = "login" | "register";
 
 export function ChurchPlannerApp() {
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -40,12 +42,68 @@ export function ChurchPlannerApp() {
   const [autoDeleteCompleted, setAutoDeleteCompleted] = useState(true);
   const [activeTab, setActiveTab] = useState<AppTab>("inicio");
   const [isBooting, setIsBooting] = useState(true);
+  const [isStorageReady, setIsStorageReady] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authUserEmail, setAuthUserEmail] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(isCloudEnabled);
 
   useEffect(() => {
-    setEvents(loadEvents());
-    setTasks(loadTasks());
-    setTheme(loadTheme());
+    let active = true;
+
+    const bootstrap = async () => {
+      setAuthError(null);
+      setTheme(loadTheme());
+
+      if (!isCloudEnabled) {
+        setEvents(loadEvents());
+        setTasks(loadTasks());
+        setIsStorageReady(true);
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const user = await getCurrentUser();
+        if (!active) {
+          return;
+        }
+
+        if (user) {
+          const plannerData = await loadPlannerData(user.id);
+          if (!active) {
+            return;
+          }
+          setAuthUserId(user.id);
+          setAuthUserEmail(user.email ?? null);
+          setEvents(plannerData.events);
+          setTasks(plannerData.tasks);
+        }
+
+        setIsStorageReady(true);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        console.error("Error inicializando sesión cloud", error);
+        setAuthError("No se pudo validar la sesión anterior. Puedes iniciar sesión normalmente.");
+        setIsStorageReady(true);
+      } finally {
+        if (active) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    bootstrap();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -54,17 +112,28 @@ export function ChurchPlannerApp() {
   }, []);
 
   useEffect(() => {
+    if (!isStorageReady) {
+      return;
+    }
+
+    if (isCloudEnabled && authUserId) {
+      savePlannerData(authUserId, { events, tasks }).catch((error) => {
+        console.error("No se pudo guardar en la nube", error);
+      });
+      return;
+    }
+
     saveEvents(events);
-  }, [events]);
-
-  useEffect(() => {
     saveTasks(tasks);
-  }, [tasks]);
+  }, [events, tasks, isStorageReady, authUserId]);
 
   useEffect(() => {
-    saveTheme(theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
-  }, [theme]);
+    if (!isStorageReady) {
+      return;
+    }
+    saveTheme(theme);
+  }, [theme, isStorageReady]);
 
   useEffect(() => {
     if (!("Notification" in window)) {
@@ -146,6 +215,61 @@ export function ChurchPlannerApp() {
     setToastMessage("Tarea creada con éxito");
   };
 
+  const createQuickTask = (name: string) => {
+    createTask({ name });
+  };
+
+  const handleAuthSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthError(null);
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthError("Completa email y contraseña.");
+      return;
+    }
+
+    try {
+      if (authMode === "register") {
+        await signUpWithEmail(authEmail.trim(), authPassword);
+      } else {
+        await signInWithEmail(authEmail.trim(), authPassword);
+      }
+
+      const user = await getCurrentUser();
+      if (!user) {
+        setAuthError("No se pudo obtener la sesión. Vuelve a intentarlo.");
+        return;
+      }
+
+      const plannerData = await loadPlannerData(user.id);
+      setAuthUserId(user.id);
+      setAuthUserEmail(user.email ?? null);
+      setEvents(plannerData.events);
+      setTasks(plannerData.tasks);
+      setIsStorageReady(true);
+      setAuthPassword("");
+      setToastMessage("Sesión iniciada con éxito");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ocurrió un error al iniciar sesión.";
+      setAuthError(message);
+    }
+  };
+
+  const handleCloudSignOut = async () => {
+    try {
+      await signOutCloud();
+      setAuthUserId(null);
+      setAuthUserEmail(null);
+      setEvents([]);
+      setTasks([]);
+      setAuthPassword("");
+      setAuthError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo cerrar sesión.";
+      setAuthError(message);
+    }
+  };
+
   const toggleTask = (id: string, checked: boolean) => {
     if (autoDeleteCompleted && checked) {
       setTasks((prev) => prev.filter((task) => task.id !== id));
@@ -167,7 +291,7 @@ export function ChurchPlannerApp() {
       ? "rounded-2xl bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-brand-500/20"
       : "rounded-2xl bg-transparent px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-700";
 
-  if (isBooting) {
+  if (isBooting || authLoading) {
     return (
       <main className="splash-enter flex min-h-screen items-center justify-center px-5">
         <section className="card w-full max-w-sm text-center">
@@ -189,6 +313,67 @@ export function ChurchPlannerApp() {
     );
   }
 
+  if (isCloudEnabled && !authUserId) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-6">
+        <section className="card w-full space-y-4">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Agenda Ministerial</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-300">
+              Ingresa con tu cuenta para guardar tareas y eventos personales en la nube.
+            </p>
+          </div>
+
+          <div className="flex gap-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setAuthMode("login")}
+              className={`w-full rounded-xl py-2 text-sm font-semibold transition ${
+                authMode === "login" ? "bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100" : "text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode("register")}
+              className={`w-full rounded-xl py-2 text-sm font-semibold transition ${
+                authMode === "register" ? "bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100" : "text-slate-600 dark:text-slate-300"
+              }`}
+            >
+              Crear cuenta
+            </button>
+          </div>
+
+          <form className="space-y-3" onSubmit={handleAuthSubmit}>
+            <input
+              className="input"
+              type="email"
+              value={authEmail}
+              onChange={(event) => setAuthEmail(event.target.value)}
+              placeholder="Email"
+              autoComplete="email"
+              required
+            />
+            <input
+              className="input"
+              type="password"
+              value={authPassword}
+              onChange={(event) => setAuthPassword(event.target.value)}
+              placeholder="Contraseña"
+              autoComplete={authMode === "login" ? "current-password" : "new-password"}
+              required
+            />
+            {authError ? <p className="text-sm text-red-600 dark:text-red-400">{authError}</p> : null}
+            <button type="submit" className="button-primary w-full">
+              {authMode === "login" ? "Entrar a mi agenda" : "Crear cuenta y continuar"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl space-y-4 px-4 py-4 pb-24 sm:space-y-5 sm:px-6 sm:pb-6">
       {activeTab === "inicio" && (
@@ -205,23 +390,20 @@ export function ChurchPlannerApp() {
                 Organiza tu calendario, tareas y actividades pastorales en minutos.
               </p>
             </div>
-            <ThemeToggle theme={theme} onToggle={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))} />
+            <div className="flex items-center gap-2">
+              {isCloudEnabled && authUserEmail ? (
+                <button
+                  type="button"
+                  onClick={handleCloudSignOut}
+                  className="button-secondary px-3 py-2 text-xs"
+                  title={`Cerrar sesión (${authUserEmail})`}
+                >
+                  Salir
+                </button>
+              ) : null}
+              <ThemeToggle theme={theme} onToggle={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))} />
+            </div>
           </header>
-
-          <section className="card flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 rounded-2xl bg-brand-50 px-3 py-2 dark:bg-slate-700/70">
-              <Sparkles size={16} className="text-brand-600 dark:text-brand-100" />
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-300">Hoy</p>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{todayEventCount} actividades</p>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-slate-100 px-3 py-2 text-right dark:bg-slate-700/70">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-300">Pendientes</p>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{pendingTaskCount} tareas</p>
-            </div>
-          </section>
-
         </>
       )}
 
@@ -241,7 +423,14 @@ export function ChurchPlannerApp() {
 
       {activeTab === "inicio" && (
         <div key="tab-inicio" className="tab-content-enter">
-          <DashboardPanel events={events} tasks={tasks} now={now} onGoToTasks={() => setActiveTab("tareas")} />
+          <DashboardPanel
+            events={events}
+            tasks={tasks}
+            now={now}
+            onGoToTasks={() => setActiveTab("tareas")}
+            onQuickCreateTask={createQuickTask}
+            onToggleTask={toggleTask}
+          />
         </div>
       )}
 
