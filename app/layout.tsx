@@ -10,18 +10,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Agenda Iglesia",
-  description: "Calendario y tareas para líderes y pastores",
-  manifest: "/manifest.webmanifest",
-  themeColor: "#4f8f73",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Agenda Iglesia"
-  },
-  icons: {
-    icon: "/icon",
-    apple: "/apple-icon"
-  }
+  description: "Calendario y tareas para líderes y pastores"
 };
 
 export default function RootLayout({
