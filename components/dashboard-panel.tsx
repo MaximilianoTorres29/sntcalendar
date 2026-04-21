@@ -17,6 +17,20 @@ interface DashboardPanelProps {
 
 type TaskFilter = "hoy" | "proximas" | "vencidas";
 
+const toLocalTaskDate = (task: TaskItem) => {
+  if (!task.deadlineDate) {
+    return null;
+  }
+
+  const [year, month, day] = task.deadlineDate.split("-").map((value) => Number(value));
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const [hours, minutes] = (task.deadlineTime ?? "23:59").split(":").map((value) => Number(value));
+  return new Date(year, month - 1, day, Number.isNaN(hours) ? 23 : hours, Number.isNaN(minutes) ? 59 : minutes);
+};
+
 export function DashboardPanel({ events, tasks, now, onGoToTasks, onQuickCreateTask, onToggleTask }: DashboardPanelProps) {
   const [quickTaskName, setQuickTaskName] = useState("");
   const [activeFilter, setActiveFilter] = useState<TaskFilter>("hoy");
@@ -37,25 +51,26 @@ export function DashboardPanel({ events, tasks, now, onGoToTasks, onQuickCreateT
   const dayEnd = endOfDay(now);
 
   const todayTasks = pendingTasks.filter((task) => {
-    if (!task.deadlineDate) {
+    const dueDate = toLocalTaskDate(task);
+    if (!dueDate) {
       return true;
     }
-    return isSameDay(new Date(task.deadlineDate), now);
+    return isSameDay(dueDate, now);
   });
 
   const upcomingTasks = pendingTasks.filter((task) => {
-    if (!task.deadlineDate) {
+    const dueDate = toLocalTaskDate(task);
+    if (!dueDate) {
       return false;
     }
-    const dueDate = new Date(task.deadlineDate);
     return isAfter(dueDate, dayEnd);
   });
 
   const overdueTasks = pendingTasks.filter((task) => {
-    if (!task.deadlineDate) {
+    const dueDate = toLocalTaskDate(task);
+    if (!dueDate) {
       return false;
     }
-    const dueDate = new Date(task.deadlineDate);
     return isBefore(dueDate, dayStart);
   });
 
